@@ -1,0 +1,134 @@
+name: build
+
+on:
+  push:
+    branches:    
+      - build
+jobs:
+  build:
+
+    env:
+      BUILD_TYPE: Release
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Prepare
+      run: |
+        sudo apt-get update
+        sudo apt-get install libusb-1.0-0-dev libpulse-dev locate libsndfile1-dev
+
+    - name: Checkout
+      uses: actions/checkout@01aecccf739ca6ff86c0539fbc67a7a5007bbc81
+
+    - name: Configure
+      run: |
+        mkdir dependencies
+        mkdir local
+        cd dependencies
+        git clone -b v1.3.2 https://github.com/jgaeddert/liquid-dsp.git
+        cd liquid-dsp
+        ./bootstrap.sh
+        ./configure --prefix=$PWD/../../local
+        make
+        make install
+        cd ..
+
+        git clone https://github.com/sustrik/libdill.git
+        cd libdill
+        ./autogen.sh
+        ./configure --prefix=$PWD/../../local
+        make
+        make check
+        make install
+        cd ..
+
+        git clone -b v1.6.37 git://git.code.sf.net/p/libpng/code libpng
+        cd libpng
+        ./configure --prefix=$PWD/../../local
+        make
+        make install
+        cd ..
+
+        git clone -b soapy-sdr-0.7.2 https://github.com/pothosware/SoapySDR.git
+        cd SoapySDR
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_INSTALL_PREFIX=$PWD/../../../local ..
+        make
+        make install
+        cd ../..
+
+        git clone -b 0.6.0 https://github.com/steve-m/librtlsdr.git
+        cd librtlsdr
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DDETACH_KERNEL_DRIVER=ON -DINSTALL_UDEV_RULES=ON -DCMAKE_INSTALL_PREFIX=$PWD/../../../local ..
+        make
+        sudo make install
+        cd ../..
+
+        git clone -b soapy-rtl-sdr-0.3.2 https://github.com/pothosware/SoapyRTLSDR.git
+        cd SoapyRTLSDR
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_MODULE_PATH=$PWD/../../../local/lib/pkgconfig -DCMAKE_INSTALL_PREFIX=$PWD/../../../local ..
+        make
+        make install
+        cd ../..
+
+        git clone https://github.com/thestk/rtaudio.git -b 5.1.0
+        cd rtaudio
+        ./autogen.sh
+        ./configure --prefix=$PWD/../../local
+        make
+        make check
+        make install
+        cd ..
+
+        git clone https://github.com/nyorain/dlg.git -b v0.3
+
+        git clone https://github.com/warmcat/libwebsockets.git -b v4.1.6
+        cd libwebsockets
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_INSTALL_PREFIX=$PWD/../../../local ..
+        make
+        make install
+        cd ../..
+
+        git clone -b v2.4.1 https://github.com/tensorflow/tensorflow
+        cd tensorflow/tensorflow/lite/tools/make
+        ./download_dependencies.sh
+        ./build_lib.sh
+        cp gen/linux_x86_64/lib/libtensorflow-lite.a ../../../../../../local/lib
+        cd ../../../../..
+
+        cd ..
+
+        xxd -i models/17_keywords.tflite > models/17_keywords.h
+
+        export SOAPY_SDR_PLUGIN_PATH=$PWD/local/lib/SoapySDR/modules0.8
+        export LD_LIBRARY_PATH=$PWD/local/lib/:$LD_LIBRARY_PATH
+
+        sudo ldconfig
+        sudo updatedb
+      
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..
+        make
+
+    - uses: actions/upload-artifact@e448a9b857ee2131e752b06002bf0e093c65e571
+      with:
+        name: binaries
+        path: |
+          build/wbfm_demod
+          build/flex_rx
+          build/flex_tx
+          build/keywords
+          build/wav2mel
+
