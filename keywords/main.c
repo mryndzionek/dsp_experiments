@@ -9,6 +9,7 @@
 
 #include <liquid/liquid.h>
 
+#include "util.h"
 #include "logging.h"
 
 #include "audio_source.h"
@@ -128,14 +129,18 @@ static coroutine void tf_sink(link_t *input)
 int main(int argc, char *argv[])
 {
     int ret;
+    link_msg_t msg;
 
     logging_init();
     audio_source_t *source = audio_source_create(AUDIO_SAMPLERATE);
     int h = go(tf_sink(audio_source_get_output(source)));
 
+    int cc = install_sigint_handler();
+
     audio_source_start(source);
 
-    msleep(-1);
+    ret = chrecv(cc, &msg, sizeof(link_msg_t), -1);
+    log_assert(ret == 0);
 
     audio_source_destroy(&source);
     ret = hclose(h);
