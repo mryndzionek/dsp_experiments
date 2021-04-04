@@ -25,7 +25,7 @@
 #define SLICES (60UL)
 #define SLICE_STEP (SLICES / 3)
 #define OUTPUT_SIZE (SLICES * SLICE_SIZE)
-#define DETECTION_THRESHOLD (10.0) // depends on audio quality
+#define DETECTION_THRESHOLD (9.0) // depends on microphone/audio quality
 
 static coroutine void tf_sink(link_t *input)
 {

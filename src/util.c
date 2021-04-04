@@ -21,6 +21,7 @@ static void intHandler(int signo)
 {
     LOG(INFO, "Caught signal %d", signo);
     char b = signo;
+    signal(SIGINT, SIG_DFL);
     ssize_t sz = write(signal_pipe[1], &b, 1);
     assert(sz == 1);
 }
