@@ -36,7 +36,7 @@ Turns 16kHz sampled 1s wave files into a Mel scale spectrogram in a form of a PN
 
 ### keywords
 
-Recognizes 17 keywords spoken into a microphone.
+Recognizes 17 keywords spoken into a microphone. Some details regarding model training [here](tf_model/README.md).
 
 ## TODO
 
