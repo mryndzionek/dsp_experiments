@@ -21,7 +21,7 @@
 #define SAMPLE_RATE (16000UL)
 #define NUM_SAMPLES (1 * SAMPLE_RATE)
 #define OUTPUT_BIN_SIZE (80UL)
-#define NUM_OUTPUT_BINS (60UL)
+#define NUM_OUTPUT_BINS (((NUM_SAMPLES - FRAME_LEN) / FRAME_STEP) + 1)
 #define OUTPUT_SIZE (NUM_OUTPUT_BINS * OUTPUT_BIN_SIZE)
 
 #define MODEL_FILE "../models/17_keywords.tflite"
@@ -78,13 +78,10 @@ int main(int argc, char *argv[])
     void *dest;
     SF_INFO sfinfo;
     sf_count_t read;
-    sf_count_t to_read = NUM_SAMPLES;
 
     ctx.mel = mel_spectrum_create(FRAME_LEN, OUTPUT_BIN_SIZE, NUM_SAMPLES,
                                   20.0, 7600);
     log_assert(ctx.mel);
-
-    ctx.n = 0;
 
     SNDFILE *file = sf_open(wav_file_name, SFM_READ, &sfinfo);
     log_assert(file);
@@ -94,19 +91,18 @@ int main(int argc, char *argv[])
 
     read = sf_read_float(file, ctx.input, FRAME_LEN);
     log_assert(read == FRAME_LEN);
-    to_read -= read;
 
     mel_spectrum_process(ctx.mel, ctx.input, ctx.output);
-    ctx.n += OUTPUT_BIN_SIZE;
+    ctx.n = 1;
 
     dest = memmove(ctx.input, &ctx.input[FRAME_STEP], FRAME_END * sizeof(float));
     log_assert(dest == ctx.input);
 
-    while ((read = sf_read_float(file, &ctx.input[FRAME_END], FRAME_STEP)) && (to_read > 0))
+    while ((read = sf_read_float(file, &ctx.input[FRAME_END], FRAME_STEP)) && (ctx.n < NUM_OUTPUT_BINS))
     {
         log_assert(read <= FRAME_STEP);
-        mel_spectrum_process(ctx.mel, ctx.input, &ctx.output[ctx.n]);
-        ctx.n += OUTPUT_BIN_SIZE;
+        mel_spectrum_process(ctx.mel, ctx.input, &ctx.output[ctx.n * OUTPUT_BIN_SIZE]);
+        ctx.n++;
 
         dest = memmove(ctx.input, &ctx.input[FRAME_STEP], FRAME_END * sizeof(float));
         log_assert(dest == ctx.input);
@@ -114,53 +110,47 @@ int main(int argc, char *argv[])
         {
             ctx.input[FRAME_END + i] = 0.001 * rand() / RAND_MAX;
         }
-        if (to_read < FRAME_STEP)
-        {
-            LOG(WARN, "Padded with noise");
-        }
-        to_read -= FRAME_STEP;
     }
 
-    if (to_read > 0)
+    if (ctx.n < NUM_OUTPUT_BINS)
     {
         LOG(WARN, "File too short. Padding with noise");
     }
 
-    while (to_read > 0)
+    while (ctx.n < NUM_OUTPUT_BINS)
     {
         for (i = 0; i < FRAME_STEP; i++)
         {
             ctx.input[FRAME_END + i] = 0.001 * rand() / RAND_MAX;
         }
-        mel_spectrum_process(ctx.mel, ctx.input, &ctx.output[ctx.n]);
-        ctx.n += OUTPUT_BIN_SIZE;
+        mel_spectrum_process(ctx.mel, ctx.input, &ctx.output[ctx.n * OUTPUT_BIN_SIZE]);
 
         dest = memmove(ctx.input, &ctx.input[FRAME_STEP], FRAME_END * sizeof(float));
         log_assert(dest == ctx.input);
         dest = memset(&ctx.input[FRAME_END], 0, FRAME_STEP * sizeof(float));
         log_assert(dest == &ctx.input[FRAME_END]);
-        to_read -= FRAME_STEP;
+        ctx.n++;
     }
 
-    log_assert(ctx.n == OUTPUT_SIZE);
+    log_assert(ctx.n == NUM_OUTPUT_BINS);
 
     tflite_runner_t *tfr = tflite_runner_create_from_file(MODEL_FILE);
     float score;
     int id = tflite_runner_run(tfr, ctx.output, OUTPUT_SIZE, &score);
     if (id >= 0)
     {
-        LOG(INFO, "Predicted keywoard: %s (%f)", tflite_get_label(id), score);
+        LOG(INFO, "Predicted keyword: %s (%f)", tflite_get_label(id), score);
     }
     else
     {
-        LOG(ERROR, "Failed to predict keywoard");
+        LOG(ERROR, "Failed to predict keyword");
     }
     tflite_runner_destroy(&tfr);
 
     normalize(ctx.output, OUTPUT_SIZE);
     {
         png_image image;
-        uint8_t buff[NUM_OUTPUT_BINS * OUTPUT_BIN_SIZE];
+        uint8_t buff[OUTPUT_SIZE];
 
         for(i = 0; i < OUTPUT_SIZE; i++)
         {

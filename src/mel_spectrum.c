@@ -1,6 +1,7 @@
 #include "mel_spectrum.h"
 
 #include <math.h>
+#include <float.h>
 
 #include <liquid/liquid.h>
 
@@ -14,8 +15,6 @@ struct _mel_spectrum_t
     size_t input_size;
     size_t output_size;
     smatrixf mel_mat;
-    firhilbf fh;
-    nco_crcf nco;
     fftplan pf;
     float *w;
     float complex *x;
@@ -103,7 +102,7 @@ mel_spectrum_t *mel_spectrum_create(size_t input_size,
     log_assert(self);
 
     self->mel_mat = linear_to_mel_weight_matrix(output_size,
-                                                input_size / 2,
+                                                (input_size / 2) + 1,
                                                 sample_rate,
                                                 lower_edge_hertz,
                                                 upper_edge_hertz);
@@ -115,10 +114,10 @@ mel_spectrum_t *mel_spectrum_create(size_t input_size,
     self->w = malloc(input_size * sizeof(float));
     log_assert(self->w);
 
-    self->x = malloc((input_size / 2) * sizeof(complex float));
+    self->x = malloc(input_size * sizeof(complex float));
     log_assert(self->x);
 
-    self->X = malloc((input_size / 2) * sizeof(complex float));
+    self->X = malloc(input_size * sizeof(complex float));
     log_assert(self->X);
 
     for (size_t i = 0; i < input_size; i++)
@@ -126,17 +125,7 @@ mel_spectrum_t *mel_spectrum_create(size_t input_size,
         self->w[i] = hann_(i, input_size);
     }
 
-    self->fh = firhilbf_create(5, 60.0f);
-    log_assert(self->fh);
-
-    self->nco = nco_crcf_create(LIQUID_VCO);
-    log_assert(self->nco);
-    {
-        float f = 2 * M_PI * 0.5f;
-        nco_crcf_set_frequency(self->nco, f);
-    }
-
-    self->pf = fft_create_plan(input_size / 2, self->x, self->X, LIQUID_FFT_FORWARD, 0);
+    self->pf = fft_create_plan(input_size, self->x, self->X, LIQUID_FFT_FORWARD, 0);
     log_assert(self->pf);
 
     return self;
@@ -145,28 +134,26 @@ mel_spectrum_t *mel_spectrum_create(size_t input_size,
 void mel_spectrum_process(mel_spectrum_t *self, float const *input, float *output)
 {
     size_t i;
-    float tmp[self->input_size];
+    float tmp[(self->input_size / 2) + 1];
 
     for (i = 0; i < self->input_size; i++)
     {
-        tmp[i] = input[i] * self->w[i];
+        self->x[i] = (input[i] * self->w[i]) + (_Complex_I*(float)0.0);
     }
-
-    firhilbf_decim_execute_block(self->fh, tmp, self->input_size / 2, self->x);
-    nco_crcf_mix_block_down(self->nco, self->x, self->x, self->input_size / 2);
 
     fft_execute(self->pf);
 
-    for (size_t i = 0; i < self->input_size / 2; i++)
+    for (size_t i = 0; i < (self->input_size / 2) + 1; i++)
     {
         tmp[i] = cabsf(self->X[i]);
+        tmp[i] *= tmp[i];
     }
 
     smatrixf_vmul(self->mel_mat, tmp, output);
 
     for (i = 0; i < self->output_size; i++)
     {
-        output[i] = log(output[i] + 1e-6);
+        output[i] = log(output[i] + FLT_MIN);
     }
 }
 
@@ -181,8 +168,6 @@ void mel_spectrum_destroy(mel_spectrum_t **self_p)
         free(self->x);
         free(self->X);
         smatrixf_destroy(self->mel_mat);
-        firhilbf_destroy(self->fh);
-        nco_crcf_destroy(self->nco);
         fft_destroy_plan(self->pf);
         free(self);
         *self_p = NULL;
