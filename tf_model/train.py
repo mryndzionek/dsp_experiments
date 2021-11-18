@@ -1,20 +1,22 @@
 import os
+import csv
 from functools import partial
+
+import seaborn as sns
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import cm, colors
+import logging
+import pathlib
+from PIL import Image
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
-
-from tensorflow.python.keras.backend import log
-from tensorflow.keras import models
 from tensorflow.keras import layers
+from tensorflow.keras import models
+from tensorflow.python.keras.backend import log
+from sklearn import preprocessing
 
-import pathlib
-
-import logging
-
-import matplotlib.pyplot as plt
-import numpy as np
-import seaborn as sns
 
 SAMPLE_RATE = 16000
 TRANSPARENT = False
@@ -75,36 +77,37 @@ def get_mel_spectrogram(mel_matrix, spectrograms):
 
 
 def plot_spectrogram(spectrogram, ax):
-  # Convert to frequencies to log scale and transpose so that the time is
-  # represented in the x-axis (columns).
-  log_spec = np.log(spectrogram.T)
-  X = np.linspace(0, SAMPLE_RATE, log_spec.shape[1])
-  Y = range(log_spec.shape[0])
-  ax.pcolormesh(X, Y, log_spec, shading='auto')
+    # Convert to frequencies to log scale and transpose so that the time is
+    # represented in the x-axis (columns).
+    log_spec = np.log(spectrogram.T)
+    X = np.linspace(0, SAMPLE_RATE, log_spec.shape[1])
+    Y = range(log_spec.shape[0])
+    ax.pcolormesh(X, Y, log_spec, shading='auto')
 
 
 def plot_mel(mel_spectrogram, ax):
-  C = np.swapaxes(mel_spectrogram, 0, 1)
-  X = np.linspace(0, SAMPLE_RATE, C.shape[1])
-  Y = range(C.shape[0])
-  ax.pcolormesh(X, Y, C, shading='auto')
+    C = np.swapaxes(mel_spectrogram, 0, 1)
+    X = np.linspace(0, SAMPLE_RATE, C.shape[1])
+    Y = range(C.shape[0])
+    ax.pcolormesh(X, Y, C, shading='auto')
 
 
 def _get_mel_and_label_id(mel_matrix, audio, label):
-  spectrogram = get_spectrogram(audio)
-  mel = get_mel_spectrogram(mel_matrix, spectrogram)
-  #mel = get_mel_spectrogram_essentia(audio)
-  mel = tf.expand_dims(mel, -1)
-  label_id = tf.argmax(label == labels)
-  return mel, label_id
+    spectrogram = get_spectrogram(audio)
+    mel = get_mel_spectrogram(mel_matrix, spectrogram)
+    #mel = get_mel_spectrogram_essentia(audio)
+    mel = tf.expand_dims(mel, -1)
+    label_id = tf.argmax(label == labels)
+    return mel, label_id
 
 
 def preprocess_dataset(files):
-  files_ds = tf.data.Dataset.from_tensor_slices(files)
-  output_ds = files_ds.map(get_waveform_and_label, num_parallel_calls=AUTOTUNE)
-  output_ds = output_ds.map(
-      get_mel_and_label_id,  num_parallel_calls=AUTOTUNE)
-  return output_ds
+    files_ds = tf.data.Dataset.from_tensor_slices(files)
+    output_ds = files_ds.map(get_waveform_and_label,
+                             num_parallel_calls=AUTOTUNE)
+    output_ds = output_ds.map(
+        get_mel_and_label_id,  num_parallel_calls=AUTOTUNE)
+    return output_ds
 
 
 logging.basicConfig(level=logging.INFO,
@@ -116,7 +119,7 @@ logging.info('Tensorflow version: %s', tf.__version__)
 assert(tf.__version__ == '2.7.0')
 
 logging.info(tf.config.list_physical_devices())
-#tf.config.set_visible_devices([], 'GPU') # to force CPU
+# tf.config.set_visible_devices([], 'GPU') # to force CPU
 
 # Set seed for experiment reproducibility
 seed = 42
@@ -125,15 +128,17 @@ np.random.seed(seed)
 
 data_dir = pathlib.Path('data')
 if not data_dir.exists():
-  tf.keras.utils.get_file(
-      'speech_commands.tar.gz',
-      origin="http://download.tensorflow.org/data/speech_commands_v0.02.tar.gz",
-      extract=True,
-      cache_dir='.', cache_subdir='data')
+    tf.keras.utils.get_file(
+        'speech_commands.tar.gz',
+        origin="http://download.tensorflow.org/data/speech_commands_v0.02.tar.gz",
+        extract=True,
+        cache_dir='.', cache_subdir='data')
 
 #labels = np.array(tf.io.gfile.listdir(str(data_dir)))
-labels = ['down', 'go', 'left', 'no', 'off',
-          'on', 'right', 'stop', 'up', 'yes']
+labels = ["zero", "one", "two", "three",
+          "four", "five", "six", "seven",
+          "eight", "nine", "yes", "no",
+          "left", "right", "up", "down", "go"]
 logging.info('Labels: %s', labels)
 
 filenames = tf.io.gfile.glob(
@@ -195,7 +200,7 @@ timescale = np.arange(waveform.shape[0])
 axes[0].plot(timescale, waveform.numpy())
 axes[0].set_title('Waveform')
 for ax in axes:
-  ax.set_xlim([0, SAMPLE_RATE])
+    ax.set_xlim([0, SAMPLE_RATE])
 plot_spectrogram(spectrogram.numpy(), axes[1])
 axes[1].set_title('Spectrogram')
 plot_mel(mel_spectrogram.numpy(), axes[2])
@@ -208,12 +213,12 @@ cols = 4
 n = rows * cols
 fig, axes = plt.subplots(rows, cols, figsize=(10, 10))
 for i, (spectrogram, label_id) in enumerate(mel_ds.take(n)):
-  r = i // cols
-  c = i % cols
-  ax = axes[r][c]
-  plot_mel(np.squeeze(spectrogram.numpy()), ax)
-  ax.set_title(labels[label_id.numpy()])
-  ax.axis('off')
+    r = i // cols
+    c = i % cols
+    ax = axes[r][c]
+    plot_mel(np.squeeze(spectrogram.numpy()), ax)
+    ax.set_title(labels[label_id.numpy()])
+    ax.axis('off')
 
 plt.savefig('figures/mel_spectrograms.png', transparent=TRANSPARENT)
 
@@ -232,7 +237,7 @@ train_ds = train_ds.cache().prefetch(AUTOTUNE)
 val_ds = val_ds.cache().prefetch(AUTOTUNE)
 
 for spectrogram, _ in mel_ds.take(1):
-  input_shape = spectrogram.shape
+    input_shape = spectrogram.shape
 logging.info('Input shape: %s', input_shape)
 num_labels = len(labels)
 
@@ -274,7 +279,7 @@ model.save('model.h5')
 converter = tf.lite.TFLiteConverter.from_keras_model(model)
 tflite_model = converter.convert()
 with open('model.tflite', 'wb') as f:
-  f.write(tflite_model)
+    f.write(tflite_model)
 
 acc = history.history['accuracy']
 val_acc = history.history['val_accuracy']
@@ -302,8 +307,8 @@ test_audio = []
 test_labels = []
 
 for audio, label in test_ds:
-  test_audio.append(audio.numpy())
-  test_labels.append(label.numpy())
+    test_audio.append(audio.numpy())
+    test_labels.append(label.numpy())
 
 test_audio = np.array(test_audio)
 test_labels = np.array(test_labels)
@@ -321,3 +326,23 @@ sns.heatmap(confusion_mtx, xticklabels=labels, yticklabels=labels,
 plt.xlabel('Prediction')
 plt.ylabel('Label')
 plt.savefig('figures/confusion_mat.png', transparent=TRANSPARENT)
+
+embeddings = tf.keras.models.Model(
+    inputs=model.inputs,
+    outputs=model.layers[-2].output
+)
+
+NUM_EMBEDDINGS = 1500
+images_embeddings = []
+for i, (spectrogram, label_id) in enumerate(test_ds.take(NUM_EMBEDDINGS)):
+    img_embedding = embeddings(tf.expand_dims(spectrogram, axis=0))
+    images_embeddings.append(img_embedding.numpy()[0])
+
+with open(f'feature_vecs.tsv', 'w') as fw:
+    csv_writer = csv.writer(fw, delimiter='\t')
+    csv_writer.writerows(images_embeddings)
+
+with open('metadata.tsv', 'w') as file:
+    for fn in test_files:
+       label = get_label(fn)
+       file.write("{}\n".format(label))
