@@ -98,12 +98,14 @@ jobs:
         make install
         cd ../..
 
-        git clone -b v2.4.1 https://github.com/tensorflow/tensorflow
-        cd tensorflow/tensorflow/lite/tools/make
-        ./download_dependencies.sh
-        ./build_lib.sh
-        cp gen/linux_x86_64/lib/libtensorflow-lite.a ../../../../../../local/lib
-        cd ../../../../..
+        git clone -b v2.7.0 https://github.com/tensorflow/tensorflow tensorflow_src
+        mkdir tflite_build
+        cd tflite_build
+        cmake ../tensorflow_src/tensorflow/lite
+        make -j4
+        make install
+        find . -iname "*.a" -exec cp -- "{}" ../../local/lib \;
+        cd ..
 
         cd ..
 

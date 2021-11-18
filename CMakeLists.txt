@@ -7,8 +7,9 @@ set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -s")
 include_directories(include local/include
                     models
                     dependencies/dlg/include
-                    dependencies/tensorflow
-                    dependencies/tensorflow/tensorflow/lite/tools/make/downloads/flatbuffers/include/)
+                    dependencies/tflite_build
+                    dependencies/tensorflow_src
+                    dependencies/tflite_build/flatbuffers/include/)
 link_directories(local/lib)
 
 set(SRCS src/link.c src/logging.c src/util.c dependencies/dlg/src/dlg/dlg.c)
@@ -43,8 +44,10 @@ add_executable(wav2mel wav2mel/main.c
                        src/tflite_runner.cc
                        src/logging.c
                        dependencies/dlg/src/dlg/dlg.c)
-target_link_libraries(wav2mel m pthread sndfile png
-                              libliquid.a libtensorflow-lite.a dl)
+target_link_libraries(wav2mel m dl pthread sndfile png
+                              libliquid.a libruy.a libXNNPACK.a libcpuinfo.a
+                              libpthreadpool.a libflatbuffers.a libfft2d_fftsg.a
+                              libfft2d_fftsg2d.a libclog.a libfarmhash.a libtensorflow-lite.a dl)
 
 add_executable(keywords keywords/main.c
                         src/mel_spectrum.c
@@ -52,6 +55,7 @@ add_executable(keywords keywords/main.c
                         src/tflite_runner.cc
                         ${SRCS})
 target_link_libraries(keywords m dl pthread pulse-simple pulse libliquid.a
-                               libwebsockets.a libdill.a
-                               libtensorflow-lite.a librtaudio.a dl)
+                               libwebsockets.a libdill.a libruy.a libXNNPACK.a libcpuinfo.a
+                               libpthreadpool.a libflatbuffers.a libfft2d_fftsg.a libfft2d_fftsg2d.a
+                               libclog.a libfarmhash.a libtensorflow-lite.a librtaudio.a dl)
 
