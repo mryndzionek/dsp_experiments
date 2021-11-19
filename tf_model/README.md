@@ -56,3 +56,17 @@ Here are the results:
 ![confusion-mat](figures/confusion_mat.png)
 
 Accuracy for random sample from test set is: 93.1%
+
+Here are also some embedding projections of the `dense` layer (128 dimensions).
+
+### PCA
+
+![pca](figures/pca.gif)
+
+### UMAP
+
+![umap](figures/umap.gif)
+
+### t-SNE
+
+![tsne](figures/tsne.gif)
