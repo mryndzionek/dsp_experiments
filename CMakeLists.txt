@@ -59,3 +59,6 @@ target_link_libraries(keywords m dl pthread pulse-simple pulse libliquid.a
                                libpthreadpool.a libflatbuffers.a libfft2d_fftsg.a libfft2d_fftsg2d.a
                                libclog.a libfarmhash.a libtensorflow-lite.a librtaudio.a dl)
 
+add_executable(lpc_decoder lpc_decoder/main.c lpc_decoder/lpc.c lpc_decoder/lpc_data.c)
+target_link_libraries(lpc_decoder ${LIBS})
+

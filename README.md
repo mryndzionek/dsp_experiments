@@ -38,6 +38,16 @@ Turns 16kHz sampled 1s wave files into a Mel scale spectrogram in a form of a PN
 
 Recognizes 17 keywords spoken into a microphone. Some details regarding model training [here](tf_model/README.md).
 
+### lpc_decoder
+
+Decoded sound from LPC (Linear predictive coding) coefficients
+
+Usage:
+
+```sh
+./lpc_decoder | play -t raw -b 16 -e signed -c 1 -v 1 -r 11000 -
+```
+
 ## TODO
 
   - [ ] eliminate temporary buffer on stack in `link_run`

@@ -141,4 +141,5 @@ jobs:
           build/flex_tx
           build/keywords
           build/wav2mel
+          build/lpc_decoder
 
