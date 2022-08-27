@@ -1,0 +1,4 @@
+data/
+.vscode/
+lpc_data.h
+lpc_data.c
