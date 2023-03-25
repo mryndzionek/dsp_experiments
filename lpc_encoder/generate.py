@@ -77,6 +77,11 @@ def from_LPC(fn):
         G = G[:-to_remove]
         AA = AA[:-to_remove]
 
+    # normalize gain
+    max_g = max(G)
+    min_g = min(G)
+    G = list(map(lambda g: (g - min_g) / max_g, G))
+
     nc = len(AA)
     fl = round(dx / samplingPeriod)
     sr = round(1.0 / samplingPeriod)
